@@ -197,6 +197,12 @@
       <div id="breakdown"></div>
     </details>
   </section>
+
+  <section>
+    <h2 style="margin-top:0;">Sequence analysis</h2>
+    <p class="small">N−1 deletion impurities (one monomer omitted) with recalculated molecular weights.</p>
+    <div id="deletionAnalysis"></div>
+  </section>
 </main>
 
 <script>
@@ -212,6 +218,7 @@
   const resultEl = document.getElementById('mwResult');
   const breakdownEl = document.getElementById('breakdown');
   const summaryEl = document.getElementById('summary');
+  const deletionEl = document.getElementById('deletionAnalysis');
 
   const defaultDNA = {
     A: 313.21,
@@ -435,6 +442,61 @@
     summaryEl.textContent = `Monomers: ${tokens.length} | Linkages: ${totals.linkageCount} | PS: ${totals.psCount}. Equation: ${parts.join(' ')}.`;
   }
 
+  function buildDeletionVariants(tokens, psMarkers, deltas) {
+    if (tokens.length <= 1) return [];
+
+    return tokens.map((token, removeIdx) => {
+      const variantTokens = tokens.filter((_, idx) => idx !== removeIdx);
+      if (variantTokens.length === 0) {
+        return null;
+      }
+
+      const variantPsMarkers = psMarkers.slice();
+      if (variantPsMarkers.length) {
+        const spliceIndex = Math.max(removeIdx - 1, 0);
+        variantPsMarkers.splice(spliceIndex, 1);
+      }
+
+      const totals = computeMW(variantTokens, variantPsMarkers, deltas);
+
+      return {
+        removeIdx,
+        removedText: token.text,
+        removedType: token.type,
+        totals
+      };
+    }).filter(Boolean);
+  }
+
+  function renderDeletionAnalysis(tokens, psMarkers, totals, deltas) {
+    if (tokens.length <= 1) {
+      deletionEl.innerHTML = '<p class="small">Enter two or more monomers to view N−1 deletion results.</p>';
+      return;
+    }
+
+    const variants = buildDeletionVariants(tokens, psMarkers, deltas);
+    const rows = variants.map(v => {
+      const delta = v.totals.total - totals.total;
+      return `
+        <tr>
+          <td>${v.removeIdx + 1}</td>
+          <td class="mono">${v.removedText}</td>
+          <td>${v.removedType}</td>
+          <td>${v.totals.total.toFixed(3)}</td>
+          <td>${delta >= 0 ? '+' : ''}${delta.toFixed(3)}</td>
+        </tr>`;
+    }).join('');
+
+    deletionEl.innerHTML = `
+      <table>
+        <thead>
+          <tr><th>Removed position</th><th>Token</th><th>Type</th><th>MW (Da)</th><th>Δ vs full (Da)</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
   function calculate() {
     try {
       const tables = getMassTables();
@@ -453,11 +515,13 @@
       setStatus('OK', true);
       resultEl.textContent = `Molecular weight: ${totals.total.toFixed(3)} Da`;
       renderBreakdown(tokens, psMarkers, totals, deltas);
+      renderDeletionAnalysis(tokens, psMarkers, totals, deltas);
     } catch (err) {
       setStatus(err.message, false);
       resultEl.textContent = 'Molecular weight: –';
       breakdownEl.innerHTML = '';
       summaryEl.textContent = '';
+      deletionEl.innerHTML = '';
     }
   }
 
