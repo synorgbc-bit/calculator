@@ -179,6 +179,10 @@
         <textarea id="lnaMasses" class="mono" rows="5"></textarea>
       </div>
       <div>
+        <label for="pmoMasses">PMO residue masses (pA/pC/pG/pT)</label>
+        <textarea id="pmoMasses" class="mono" rows="5"></textarea>
+      </div>
+      <div>
         <label for="modMasses">/code/ modification masses</label>
         <textarea id="modMasses" class="mono" rows="5"></textarea>
       </div>
@@ -199,6 +203,10 @@
       <div>
         <label for="lnaExt">LNA residues (M⁻¹ cm⁻¹)</label>
         <textarea id="lnaExt" class="mono" rows="5"></textarea>
+      </div>
+      <div>
+        <label for="pmoExt">PMO residues (M⁻¹ cm⁻¹)</label>
+        <textarea id="pmoExt" class="mono" rows="5"></textarea>
       </div>
       <div>
         <label for="modExt">/code/ modifications (M⁻¹ cm⁻¹)</label>
@@ -232,10 +240,12 @@
   const dnaMassesEl = document.getElementById('dnaMasses');
   const rnaMassesEl = document.getElementById('rnaMasses');
   const lnaMassesEl = document.getElementById('lnaMasses');
+  const pmoMassesEl = document.getElementById('pmoMasses');
   const modMassesEl = document.getElementById('modMasses');
   const dnaExtEl = document.getElementById('dnaExt');
   const rnaExtEl = document.getElementById('rnaExt');
   const lnaExtEl = document.getElementById('lnaExt');
+  const pmoExtEl = document.getElementById('pmoExt');
   const modExtEl = document.getElementById('modExt');
   const seqEl = document.getElementById('sequence');
   const waterLossEl = document.getElementById('waterLoss');
@@ -269,6 +279,13 @@
     "iSp18": 244.36
   };
 
+  const defaultPMO = {
+    pA: 313.21,
+    pC: 289.18,
+    pG: 329.21,
+    pT: 304.2
+  };
+
   const defaultDNAExt = {
     A: 15400,
     C: 7400,
@@ -283,14 +300,23 @@
     U: 9600
   };
 
+  const defaultPMOExt = {
+    pA: 15400,
+    pC: 7400,
+    pG: 11500,
+    pT: 8700
+  };
+
   function initDefaults() {
     dnaMassesEl.value = JSON.stringify(defaultDNA, null, 2);
     rnaMassesEl.value = JSON.stringify(defaultRNA, null, 2);
     lnaMassesEl.value = JSON.stringify({}, null, 2);
+    pmoMassesEl.value = JSON.stringify(defaultPMO, null, 2);
     modMassesEl.value = JSON.stringify(defaultModMasses, null, 2);
     dnaExtEl.value = JSON.stringify(defaultDNAExt, null, 2);
     rnaExtEl.value = JSON.stringify(defaultRNAExt, null, 2);
     lnaExtEl.value = JSON.stringify(defaultDNAExt, null, 2);
+    pmoExtEl.value = JSON.stringify(defaultPMOExt, null, 2);
     modExtEl.value = JSON.stringify({}, null, 2);
     seqEl.value = '/5Phos/ATG*C*T';
   }
@@ -314,12 +340,14 @@
       dna: parseJsonInput(dnaMassesEl, 'DNA masses'),
       rna: parseJsonInput(rnaMassesEl, 'RNA masses'),
       lna: parseJsonInput(lnaMassesEl, 'LNA masses'),
+      pmo: parseJsonInput(pmoMassesEl, 'PMO masses'),
       mods: parseJsonInput(modMassesEl, 'Modification masses')
     };
     const ext = {
       dna: parseJsonInput(dnaExtEl, 'DNA extinction coefficients'),
       rna: parseJsonInput(rnaExtEl, 'RNA extinction coefficients'),
       lna: parseJsonInput(lnaExtEl, 'LNA extinction coefficients'),
+      pmo: parseJsonInput(pmoExtEl, 'PMO extinction coefficients'),
       mods: parseJsonInput(modExtEl, 'Modification extinction coefficients')
     };
 
@@ -424,6 +452,19 @@
         addLink();
         const ext = tables.ext.lna[base] ?? 0;
         tokens.push({ text: `+${base}`, type: 'LNA', mass, extCoeff: ext, notes: 'LNA residue' });
+        i += 2;
+        continue;
+      }
+
+      if (nextTwo.startsWith('p')) {
+        const base = nextTwo[1];
+        const mass = tables.masses.pmo[`p${base}`];
+        if (mass === undefined) {
+          throw new Error(`No PMO mass provided for p${base}`);
+        }
+        addLink();
+        const ext = tables.ext.pmo[`p${base}`] ?? tables.ext.dna[base] ?? 0;
+        tokens.push({ text: `p${base}`, type: 'PMO', mass, extCoeff: ext, notes: 'PMO residue' });
         i += 2;
         continue;
       }
