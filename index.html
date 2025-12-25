@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Oligonucleotide MW Calculator</title>
+  <style>
+    :root {
+      font-family: "Inter", system-ui, -apple-system, sans-serif;
+      color: #0f172a;
+      background: #f8fafc;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 20px 40px;
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 1.75rem;
+    }
+    section {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+    }
+    label {
+      font-weight: 600;
+      display: block;
+      margin-bottom: 6px;
+    }
+    textarea,
+    input[type="number"],
+    input[type="text"] {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      box-sizing: border-box;
+      background: #f8fafc;
+    }
+    textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+    .grid-3 {
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    }
+    .grid-2 {
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+    button {
+      background: #0ea5e9;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 10px 20px rgba(14, 165, 233, 0.25);
+      transition: transform 0.05s ease, box-shadow 0.2s ease;
+    }
+    button:active {
+      transform: translateY(1px);
+      box-shadow: 0 8px 16px rgba(14, 165, 233, 0.2);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #e2e8f0;
+      padding: 8px 10px;
+      font-size: 0.9rem;
+    }
+    th {
+      background: #f1f5f9;
+      text-align: left;
+    }
+    .status {
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status.ok {
+      background: #ecfdf3;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+    .status.error {
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fecdd3;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .summary {
+      margin-top: 10px;
+      font-size: 0.95rem;
+      color: #334155;
+    }
+    .mono {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+    details {
+      margin-top: 10px;
+    }
+    .small {
+      font-size: 0.85rem;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Oligonucleotide Molecular Weight Calculator</h1>
+  <p class="small">Single-file, client-side calculator for IDT-style sequences with bases, backbone markers, and /.../ modification codes.</p>
+
+  <section>
+    <div class="grid grid-3">
+      <div>
+        <label for="sequence">Sequence (IDT notation)</label>
+        <textarea id="sequence" placeholder="/5Phos/ATG*C*T"></textarea>
+      </div>
+      <div>
+        <label for="waterLoss">Water loss per linkage (Da)</label>
+        <input id="waterLoss" type="number" step="0.001" value="18.015" />
+      </div>
+      <div>
+        <label for="psDelta">PS delta per linkage (Da)</label>
+        <input id="psDelta" type="number" step="0.001" value="15.99" />
+      </div>
+      <div>
+        <label for="omeDelta">2′-O-methyl delta vs RNA (Da)</label>
+        <input id="omeDelta" type="number" step="0.001" value="14.03" />
+      </div>
+    </div>
+    <div style="margin-top: 14px;" class="row">
+      <button id="calculate">Calculate</button>
+      <span id="status" class="status ok">Ready</span>
+    </div>
+  </section>
+
+  <section>
+    <h2 style="margin-top:0;">Mass Tables (editable JSON)</h2>
+    <div class="grid grid-2">
+      <div>
+        <label for="dnaMasses">DNA residue masses</label>
+        <textarea id="dnaMasses" class="mono" rows="5"></textarea>
+      </div>
+      <div>
+        <label for="rnaMasses">RNA residue masses</label>
+        <textarea id="rnaMasses" class="mono" rows="5"></textarea>
+      </div>
+      <div>
+        <label for="lnaMasses">LNA residue masses (required for +A/+C/+G/+T)</label>
+        <textarea id="lnaMasses" class="mono" rows="5"></textarea>
+      </div>
+      <div>
+        <label for="modMasses">/code/ modification masses</label>
+        <textarea id="modMasses" class="mono" rows="5"></textarea>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="row">
+      <div>
+        <div id="mwResult" style="font-size:1.25rem;font-weight:800;">Molecular weight: –</div>
+        <div id="summary" class="summary"></div>
+      </div>
+    </div>
+    <details>
+      <summary style="cursor:pointer;font-weight:700;">Show detailed breakdown</summary>
+      <div id="breakdown"></div>
+    </details>
+  </section>
+</main>
+
+<script>
+  const dnaMassesEl = document.getElementById('dnaMasses');
+  const rnaMassesEl = document.getElementById('rnaMasses');
+  const lnaMassesEl = document.getElementById('lnaMasses');
+  const modMassesEl = document.getElementById('modMasses');
+  const seqEl = document.getElementById('sequence');
+  const waterLossEl = document.getElementById('waterLoss');
+  const psDeltaEl = document.getElementById('psDelta');
+  const omeDeltaEl = document.getElementById('omeDelta');
+  const statusEl = document.getElementById('status');
+  const resultEl = document.getElementById('mwResult');
+  const breakdownEl = document.getElementById('breakdown');
+  const summaryEl = document.getElementById('summary');
+
+  const defaultDNA = {
+    A: 313.21,
+    C: 289.18,
+    G: 329.21,
+    T: 304.2
+  };
+  const defaultRNA = {
+    A: 329.21,
+    C: 305.18,
+    G: 345.21,
+    U: 306.17
+  };
+  const defaultModMasses = {
+    "5Phos": 79.98,
+    "56-FAM": 537.47,
+    "3BHQ_1": 296.16,
+    "iSp18": 244.36
+  };
+
+  function initDefaults() {
+    dnaMassesEl.value = JSON.stringify(defaultDNA, null, 2);
+    rnaMassesEl.value = JSON.stringify(defaultRNA, null, 2);
+    lnaMassesEl.value = JSON.stringify({}, null, 2);
+    modMassesEl.value = JSON.stringify(defaultModMasses, null, 2);
+    seqEl.value = '/5Phos/ATG*C*T';
+  }
+
+  function setStatus(message, ok = true) {
+    statusEl.textContent = message;
+    statusEl.classList.toggle('ok', ok);
+    statusEl.classList.toggle('error', !ok);
+  }
+
+  function parseJsonInput(el, label) {
+    try {
+      return JSON.parse(el.value || '{}');
+    } catch (err) {
+      throw new Error(`${label} must be valid JSON`);
+    }
+  }
+
+  function getMassTables() {
+    const dna = parseJsonInput(dnaMassesEl, 'DNA masses');
+    const rna = parseJsonInput(rnaMassesEl, 'RNA masses');
+    const lna = parseJsonInput(lnaMassesEl, 'LNA masses');
+    const mods = parseJsonInput(modMassesEl, 'Modification masses');
+    return { dna, rna, lna, mods };
+  }
+
+  function parseSequence(seq, tables, deltas) {
+    const clean = seq.replace(/\s+/g, '');
+    const tokens = [];
+    const psMarkers = [];
+    let pendingPS = false;
+
+    function addLink() {
+      if (tokens.length > 0) {
+        psMarkers.push(pendingPS);
+      }
+      pendingPS = false;
+    }
+
+    for (let i = 0; i < clean.length; ) {
+      const char = clean[i];
+
+      if (char === '*') {
+        if (tokens.length === 0) {
+          throw new Error('Leading * is not allowed');
+        }
+        if (pendingPS) {
+          throw new Error('Duplicate * before a monomer');
+        }
+        pendingPS = true;
+        i += 1;
+        continue;
+      }
+
+      if (char === '/') {
+        const end = clean.indexOf('/', i + 1);
+        if (end === -1) {
+          throw new Error('Unterminated /mod/ token');
+        }
+        const code = clean.slice(i + 1, end);
+        if (!code) {
+          throw new Error('Empty /mod/ token');
+        }
+        const mass = tables.mods[code];
+        if (mass === undefined) {
+          throw new Error(`No mass found for /${code}/`);
+        }
+        addLink();
+        tokens.push({ text: `/${code}/`, type: 'Modification', mass, notes: '/code/ modification' });
+        i = end + 1;
+        continue;
+      }
+
+      const nextTwo = clean.slice(i, i + 2);
+      if (nextTwo.startsWith('r')) {
+        const base = nextTwo[1];
+        const mass = tables.rna[base];
+        if (mass === undefined) {
+          throw new Error(`No RNA mass for ${nextTwo}`);
+        }
+        addLink();
+        tokens.push({ text: nextTwo, type: 'RNA', mass, notes: 'RNA residue' });
+        i += 2;
+        continue;
+      }
+
+      if (nextTwo.startsWith('m')) {
+        const base = nextTwo[1];
+        const rnaMass = tables.rna[base];
+        if (rnaMass === undefined) {
+          throw new Error(`No RNA mass for ${nextTwo}`);
+        }
+        const mass = rnaMass + deltas.ome;
+        addLink();
+        tokens.push({ text: nextTwo, type: '2′-OMe', mass, notes: `RNA + ${deltas.ome} Da` });
+        i += 2;
+        continue;
+      }
+
+      if (nextTwo.startsWith('+')) {
+        const base = nextTwo[1];
+        const mass = tables.lna[base];
+        if (mass === undefined) {
+          throw new Error(`No LNA mass provided for +${base}`);
+        }
+        addLink();
+        tokens.push({ text: `+${base}`, type: 'LNA', mass, notes: 'LNA residue' });
+        i += 2;
+        continue;
+      }
+
+      if (/^[ACGT]$/.test(char)) {
+        const mass = tables.dna[char];
+        if (mass === undefined) {
+          throw new Error(`No DNA mass for ${char}`);
+        }
+        addLink();
+        tokens.push({ text: char, type: 'DNA', mass, notes: 'DNA residue' });
+        i += 1;
+        continue;
+      }
+
+      if (char === 'U') {
+        throw new Error('Use rU for RNA uridine');
+      }
+
+      throw new Error(`Unrecognized token starting at "${clean.slice(i, i + 4)}"`);
+    }
+
+    if (pendingPS) {
+      throw new Error('Trailing * must precede a monomer');
+    }
+
+    return { tokens, psMarkers };
+  }
+
+  function computeMW(tokens, psMarkers, deltas) {
+    let massSum = 0;
+    tokens.forEach(t => massSum += t.mass);
+
+    const linkageCount = Math.max(tokens.length - 1, 0);
+    const waterLossTotal = linkageCount * deltas.waterLoss;
+    const psCount = psMarkers.filter(Boolean).length;
+    const psDeltaTotal = psCount * deltas.psDelta;
+
+    const total = massSum - waterLossTotal + psDeltaTotal;
+    return { total, linkageCount, psCount, waterLossTotal, psDeltaTotal };
+  }
+
+  function renderBreakdown(tokens, psMarkers, totals, deltas) {
+    if (tokens.length === 0) {
+      breakdownEl.innerHTML = '<p class="small">No tokens parsed.</p>';
+      summaryEl.textContent = '';
+      return;
+    }
+    const rows = tokens.map((t, idx) => `
+      <tr>
+        <td>${idx + 1}</td>
+        <td class="mono">${t.text}</td>
+        <td>${t.type}</td>
+        <td>${t.mass.toFixed(3)}</td>
+        <td>${t.notes}</td>
+      </tr>`).join('');
+
+    const psSummary = psMarkers.map((flag, idx) => flag ? `PS between ${idx + 1}-${idx + 2}` : null).filter(Boolean).join(', ');
+
+    breakdownEl.innerHTML = `
+      <table>
+        <thead>
+          <tr><th>#</th><th>Token</th><th>Type</th><th>Mass (Da)</th><th>Notes</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="small">${psSummary || 'No PS linkages noted.'}</p>
+    `;
+
+    const parts = [
+      `Σ residues = ${tokens.reduce((a, t) => a + t.mass, 0).toFixed(3)} Da`,
+      `− ${totals.waterLossTotal.toFixed(3)} Da (water loss; ${deltas.waterLoss} × ${totals.linkageCount})`,
+      `+ ${totals.psDeltaTotal.toFixed(3)} Da (PS; ${deltas.psDelta} × ${totals.psCount})`
+    ];
+
+    summaryEl.textContent = `Monomers: ${tokens.length} | Linkages: ${totals.linkageCount} | PS: ${totals.psCount}. Equation: ${parts.join(' ')}.`;
+  }
+
+  function calculate() {
+    try {
+      const tables = getMassTables();
+      const deltas = {
+        waterLoss: Number(waterLossEl.value),
+        psDelta: Number(psDeltaEl.value),
+        ome: Number(omeDeltaEl.value)
+      };
+
+      if ([deltas.waterLoss, deltas.psDelta, deltas.ome].some(v => Number.isNaN(v))) {
+        throw new Error('Numeric fields must be valid numbers');
+      }
+
+      const { tokens, psMarkers } = parseSequence(seqEl.value || '', tables, deltas);
+      const totals = computeMW(tokens, psMarkers, deltas);
+      setStatus('OK', true);
+      resultEl.textContent = `Molecular weight: ${totals.total.toFixed(3)} Da`;
+      renderBreakdown(tokens, psMarkers, totals, deltas);
+    } catch (err) {
+      setStatus(err.message, false);
+      resultEl.textContent = 'Molecular weight: –';
+      breakdownEl.innerHTML = '';
+      summaryEl.textContent = '';
+    }
+  }
+
+  document.getElementById('calculate').addEventListener('click', calculate);
+  initDefaults();
+  calculate();
+</script>
+</body>
+</html>
