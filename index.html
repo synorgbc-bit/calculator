@@ -186,9 +186,32 @@
   </section>
 
   <section>
+    <h2 style="margin-top:0;">Extinction coefficients (editable JSON)</h2>
+    <div class="grid grid-2">
+      <div>
+        <label for="dnaExt">DNA residues (M⁻¹ cm⁻¹)</label>
+        <textarea id="dnaExt" class="mono" rows="5"></textarea>
+      </div>
+      <div>
+        <label for="rnaExt">RNA residues (M⁻¹ cm⁻¹)</label>
+        <textarea id="rnaExt" class="mono" rows="5"></textarea>
+      </div>
+      <div>
+        <label for="lnaExt">LNA residues (M⁻¹ cm⁻¹)</label>
+        <textarea id="lnaExt" class="mono" rows="5"></textarea>
+      </div>
+      <div>
+        <label for="modExt">/code/ modifications (M⁻¹ cm⁻¹)</label>
+        <textarea id="modExt" class="mono" rows="5"></textarea>
+      </div>
+    </div>
+  </section>
+
+  <section>
     <div class="row">
       <div>
         <div id="mwResult" style="font-size:1.25rem;font-weight:800;">Molecular weight: –</div>
+        <div id="extResult" style="margin-top:4px;font-size:1.05rem;font-weight:700;">Extinction coefficient: –</div>
         <div id="summary" class="summary"></div>
       </div>
     </div>
@@ -210,12 +233,17 @@
   const rnaMassesEl = document.getElementById('rnaMasses');
   const lnaMassesEl = document.getElementById('lnaMasses');
   const modMassesEl = document.getElementById('modMasses');
+  const dnaExtEl = document.getElementById('dnaExt');
+  const rnaExtEl = document.getElementById('rnaExt');
+  const lnaExtEl = document.getElementById('lnaExt');
+  const modExtEl = document.getElementById('modExt');
   const seqEl = document.getElementById('sequence');
   const waterLossEl = document.getElementById('waterLoss');
   const psDeltaEl = document.getElementById('psDelta');
   const omeDeltaEl = document.getElementById('omeDelta');
   const statusEl = document.getElementById('status');
   const resultEl = document.getElementById('mwResult');
+  const extResultEl = document.getElementById('extResult');
   const breakdownEl = document.getElementById('breakdown');
   const summaryEl = document.getElementById('summary');
   const deletionEl = document.getElementById('deletionAnalysis');
@@ -241,11 +269,29 @@
     "iSp18": 244.36
   };
 
+  const defaultDNAExt = {
+    A: 15400,
+    C: 7400,
+    G: 11500,
+    T: 8700
+  };
+
+  const defaultRNAExt = {
+    A: 15200,
+    C: 7200,
+    G: 12000,
+    U: 9600
+  };
+
   function initDefaults() {
     dnaMassesEl.value = JSON.stringify(defaultDNA, null, 2);
     rnaMassesEl.value = JSON.stringify(defaultRNA, null, 2);
     lnaMassesEl.value = JSON.stringify({}, null, 2);
     modMassesEl.value = JSON.stringify(defaultModMasses, null, 2);
+    dnaExtEl.value = JSON.stringify(defaultDNAExt, null, 2);
+    rnaExtEl.value = JSON.stringify(defaultRNAExt, null, 2);
+    lnaExtEl.value = JSON.stringify(defaultDNAExt, null, 2);
+    modExtEl.value = JSON.stringify({}, null, 2);
     seqEl.value = '/5Phos/ATG*C*T';
   }
 
@@ -263,12 +309,21 @@
     }
   }
 
-  function getMassTables() {
-    const dna = parseJsonInput(dnaMassesEl, 'DNA masses');
-    const rna = parseJsonInput(rnaMassesEl, 'RNA masses');
-    const lna = parseJsonInput(lnaMassesEl, 'LNA masses');
-    const mods = parseJsonInput(modMassesEl, 'Modification masses');
-    return { dna, rna, lna, mods };
+  function getTables() {
+    const masses = {
+      dna: parseJsonInput(dnaMassesEl, 'DNA masses'),
+      rna: parseJsonInput(rnaMassesEl, 'RNA masses'),
+      lna: parseJsonInput(lnaMassesEl, 'LNA masses'),
+      mods: parseJsonInput(modMassesEl, 'Modification masses')
+    };
+    const ext = {
+      dna: parseJsonInput(dnaExtEl, 'DNA extinction coefficients'),
+      rna: parseJsonInput(rnaExtEl, 'RNA extinction coefficients'),
+      lna: parseJsonInput(lnaExtEl, 'LNA extinction coefficients'),
+      mods: parseJsonInput(modExtEl, 'Modification extinction coefficients')
+    };
+
+    return { masses, ext };
   }
 
   function parseSequence(seq, tables, deltas) {
@@ -308,12 +363,13 @@
         if (!code) {
           throw new Error('Empty /mod/ token');
         }
-        const mass = tables.mods[code];
+        const mass = tables.masses.mods[code];
         if (mass === undefined) {
           throw new Error(`No mass found for /${code}/`);
         }
         addLink();
-        tokens.push({ text: `/${code}/`, type: 'Modification', mass, notes: '/code/ modification' });
+        const ext = tables.ext.mods[code] ?? 0;
+        tokens.push({ text: `/${code}/`, type: 'Modification', mass, extCoeff: ext, notes: '/code/ modification' });
         i = end + 1;
         continue;
       }
@@ -321,60 +377,65 @@
       const nextTwo = clean.slice(i, i + 2);
       if (nextTwo.startsWith('r')) {
         const base = nextTwo[1];
-        const mass = tables.rna[base];
+        const mass = tables.masses.rna[base];
         if (mass === undefined) {
           throw new Error(`No RNA mass for ${nextTwo}`);
         }
         addLink();
-        tokens.push({ text: nextTwo, type: 'RNA', mass, notes: 'RNA residue' });
+        const ext = tables.ext.rna[base] ?? 0;
+        tokens.push({ text: nextTwo, type: 'RNA', mass, extCoeff: ext, notes: 'RNA residue' });
         i += 2;
         continue;
       }
 
       if (nextTwo.startsWith('f')) {
         const base = nextTwo[1];
-        const mass = tables.rna[`f${base}`];
+        const mass = tables.masses.rna[`f${base}`];
         if (mass === undefined) {
           throw new Error(`No fluorinated RNA mass for ${nextTwo}`);
         }
         addLink();
-        tokens.push({ text: nextTwo, type: 'Fluoro-RNA', mass, notes: 'Fluorinated RNA residue' });
+        const ext = tables.ext.rna[`f${base}`] ?? tables.ext.rna[base] ?? 0;
+        tokens.push({ text: nextTwo, type: 'Fluoro-RNA', mass, extCoeff: ext, notes: 'Fluorinated RNA residue' });
         i += 2;
         continue;
       }
 
       if (nextTwo.startsWith('m')) {
         const base = nextTwo[1];
-        const rnaMass = tables.rna[base];
+        const rnaMass = tables.masses.rna[base];
         if (rnaMass === undefined) {
           throw new Error(`No RNA mass for ${nextTwo}`);
         }
         const mass = rnaMass + deltas.ome;
         addLink();
-        tokens.push({ text: nextTwo, type: '2′-OMe', mass, notes: `RNA + ${deltas.ome} Da` });
+        const ext = tables.ext.rna[base] ?? 0;
+        tokens.push({ text: nextTwo, type: '2′-OMe', mass, extCoeff: ext, notes: `RNA + ${deltas.ome} Da` });
         i += 2;
         continue;
       }
 
       if (nextTwo.startsWith('+')) {
         const base = nextTwo[1];
-        const mass = tables.lna[base];
+        const mass = tables.masses.lna[base];
         if (mass === undefined) {
           throw new Error(`No LNA mass provided for +${base}`);
         }
         addLink();
-        tokens.push({ text: `+${base}`, type: 'LNA', mass, notes: 'LNA residue' });
+        const ext = tables.ext.lna[base] ?? 0;
+        tokens.push({ text: `+${base}`, type: 'LNA', mass, extCoeff: ext, notes: 'LNA residue' });
         i += 2;
         continue;
       }
 
       if (/^[ACGT]$/.test(char)) {
-        const mass = tables.dna[char];
+        const mass = tables.masses.dna[char];
         if (mass === undefined) {
           throw new Error(`No DNA mass for ${char}`);
         }
         addLink();
-        tokens.push({ text: char, type: 'DNA', mass, notes: 'DNA residue' });
+        const ext = tables.ext.dna[char] ?? 0;
+        tokens.push({ text: char, type: 'DNA', mass, extCoeff: ext, notes: 'DNA residue' });
         i += 1;
         continue;
       }
@@ -406,7 +467,11 @@
     return { total, linkageCount, psCount, waterLossTotal, psDeltaTotal };
   }
 
-  function renderBreakdown(tokens, psMarkers, totals, deltas) {
+  function computeExtinction(tokens) {
+    return tokens.reduce((sum, t) => sum + (t.extCoeff ?? 0), 0);
+  }
+
+  function renderBreakdown(tokens, psMarkers, totals, deltas, extinctionTotal) {
     if (tokens.length === 0) {
       breakdownEl.innerHTML = '<p class="small">No tokens parsed.</p>';
       summaryEl.textContent = '';
@@ -418,6 +483,7 @@
         <td class="mono">${t.text}</td>
         <td>${t.type}</td>
         <td>${t.mass.toFixed(3)}</td>
+        <td>${(t.extCoeff ?? 0).toFixed(0)}</td>
         <td>${t.notes}</td>
       </tr>`).join('');
 
@@ -426,7 +492,7 @@
     breakdownEl.innerHTML = `
       <table>
         <thead>
-          <tr><th>#</th><th>Token</th><th>Type</th><th>Mass (Da)</th><th>Notes</th></tr>
+          <tr><th>#</th><th>Token</th><th>Type</th><th>Mass (Da)</th><th>Ext. (M⁻¹ cm⁻¹)</th><th>Notes</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
@@ -439,7 +505,7 @@
       `+ ${totals.psDeltaTotal.toFixed(3)} Da (PS; ${deltas.psDelta} × ${totals.psCount})`
     ];
 
-    summaryEl.textContent = `Monomers: ${tokens.length} | Linkages: ${totals.linkageCount} | PS: ${totals.psCount}. Equation: ${parts.join(' ')}.`;
+    summaryEl.textContent = `Monomers: ${tokens.length} | Linkages: ${totals.linkageCount} | PS: ${totals.psCount}. Equation: ${parts.join(' ')}. Extinction: ${extinctionTotal.toFixed(0)} M⁻¹ cm⁻¹`;
   }
 
   function buildDeletionVariants(tokens, psMarkers, deltas) {
@@ -499,7 +565,7 @@
 
   function calculate() {
     try {
-      const tables = getMassTables();
+      const tables = getTables();
       const deltas = {
         waterLoss: Number(waterLossEl.value),
         psDelta: Number(psDeltaEl.value),
@@ -512,13 +578,16 @@
 
       const { tokens, psMarkers } = parseSequence(seqEl.value || '', tables, deltas);
       const totals = computeMW(tokens, psMarkers, deltas);
+      const extinction = computeExtinction(tokens);
       setStatus('OK', true);
       resultEl.textContent = `Molecular weight: ${totals.total.toFixed(3)} Da`;
-      renderBreakdown(tokens, psMarkers, totals, deltas);
+      extResultEl.textContent = `Extinction coefficient: ${extinction.toFixed(0)} M⁻¹ cm⁻¹`;
+      renderBreakdown(tokens, psMarkers, totals, deltas, extinction);
       renderDeletionAnalysis(tokens, psMarkers, totals, deltas);
     } catch (err) {
       setStatus(err.message, false);
       resultEl.textContent = 'Molecular weight: –';
+      extResultEl.textContent = 'Extinction coefficient: –';
       breakdownEl.innerHTML = '';
       summaryEl.textContent = '';
       deletionEl.innerHTML = '';
