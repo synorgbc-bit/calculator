@@ -223,7 +223,9 @@
     A: 329.21,
     C: 305.18,
     G: 345.21,
-    U: 306.17
+    U: 306.17,
+    fA: 309.18,
+    fC: 400
   };
   const defaultModMasses = {
     "5Phos": 79.98,
@@ -318,6 +320,18 @@
         }
         addLink();
         tokens.push({ text: nextTwo, type: 'RNA', mass, notes: 'RNA residue' });
+        i += 2;
+        continue;
+      }
+
+      if (nextTwo.startsWith('f')) {
+        const base = nextTwo[1];
+        const mass = tables.rna[`f${base}`];
+        if (mass === undefined) {
+          throw new Error(`No fluorinated RNA mass for ${nextTwo}`);
+        }
+        addLink();
+        tokens.push({ text: nextTwo, type: 'Fluoro-RNA', mass, notes: 'Fluorinated RNA residue' });
         i += 2;
         continue;
       }
