@@ -1,6 +1,6 @@
 # Oligonucleotide Molecular Weight Calculator
 
-A single-page, client-side calculator for IDT-style oligonucleotide sequences. It parses DNA/RNA/2′-OMe/LNA bases, `/code/` modifications (including `/RNA/` at 321.94 Da by default), and phosphorothioate linkages, then reports average molecular weight with an optional per-token breakdown.
+A single-page, client-side calculator for IDT-style oligonucleotide sequences. It parses DNA/RNA/2′-OMe/LNA bases, `/code/` modifications (including `/RNA/` at 321.94 Da and MOE defaults like `/Gmoe/` 403.29 Da, `/Tmoe/` 378.27 Da, `/mcMoe/` 377.29 Da, `/smCmoe/` 395.35 Da, `/AmOE/` 387.29 Da, `/sGmoe/` 419.35 Da, `/sTmoe/` 394.33 Da, and `/smGmoe/` 395.35 Da), and phosphorothioate linkages, then reports average molecular weight with an optional per-token breakdown.
 
 ## Use locally
 1. Clone the repository:
