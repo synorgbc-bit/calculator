@@ -365,11 +365,33 @@
     const psMarkers = [];
     let pendingPS = false;
 
+    const sortedKeys = {
+      dna: Object.keys(tables.masses.dna || {}).sort((a, b) => b.length - a.length),
+      rna: Object.keys(tables.masses.rna || {}).sort((a, b) => b.length - a.length),
+      lna: Object.keys(tables.masses.lna || {}).sort((a, b) => b.length - a.length),
+      pmo: Object.keys(tables.masses.pmo || {}).sort((a, b) => b.length - a.length)
+    };
+
     function addLink() {
       if (tokens.length > 0) {
         psMarkers.push(pendingPS);
       }
       pendingPS = false;
+    }
+
+    function tryMassMatch(scope, typeLabel, extScope = scope) {
+      for (const key of sortedKeys[scope]) {
+        if (clean.startsWith(key, i)) {
+          const mass = tables.masses[scope][key];
+          if (mass === undefined) continue;
+          addLink();
+          const ext = tables.ext[extScope]?.[key] ?? 0;
+          tokens.push({ text: key, type: typeLabel, mass, extCoeff: ext, notes: `${typeLabel} residue (table lookup)` });
+          i += key.length;
+          return true;
+        }
+      }
+      return false;
     }
 
     for (let i = 0; i < clean.length; ) {
@@ -488,6 +510,22 @@
 
       if (char === 'U') {
         throw new Error('Use rU for RNA uridine');
+      }
+
+      if (tryMassMatch('rna', 'RNA')) {
+        continue;
+      }
+
+      if (tryMassMatch('dna', 'DNA')) {
+        continue;
+      }
+
+      if (tryMassMatch('lna', 'LNA')) {
+        continue;
+      }
+
+      if (tryMassMatch('pmo', 'PMO')) {
+        continue;
       }
 
       throw new Error(`Unrecognized token starting at "${clean.slice(i, i + 4)}"`);
